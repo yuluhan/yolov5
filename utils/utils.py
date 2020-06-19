@@ -371,9 +371,9 @@ class FocalLoss(nn.Module):
         # TF implementation https://github.com/tensorflow/addons/blob/v0.7.1/tensorflow_addons/losses/focal_loss.py
         pred_prob = torch.sigmoid(pred)  # prob from logits
         p_t = true * pred_prob + (1 - true) * (1 - pred_prob)
-        alpha_factor = true * self.alpha + (1 - true) * (1 - self.alpha)
-        modulating_factor = (1.0 - p_t) ** self.gamma
-        loss *= alpha_factor * modulating_factor
+        alpha_factor = true * self.alpha + (1 - true) * (1 - self.alpha)  # alpha is used for balance the easy and hard sample
+        modulating_factor = (1.0 - p_t) ** self.gamma  # for hard sample, give more weight, easy less
+        loss *= alpha_factor * modulating_factor  # for easy sample(most are negatives), loss is lower, give negatives more weight
 
         if self.reduction == 'mean':
             return loss.mean()
@@ -417,7 +417,7 @@ def compute_loss(p, targets, model):  # predictions, targets, model
     BCEobj = nn.BCEWithLogitsLoss(pos_weight=ft([h['obj_pw']]), reduction=red)
 
     # class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
-    cp, cn = smooth_BCE(eps=0.0)
+    cp, cn = smooth_BCE(eps=0.0)   #?????????????????
 
     # focal loss
     g = h['fl_gamma']  # focal loss gamma
@@ -448,7 +448,7 @@ def compute_loss(p, targets, model):  # predictions, targets, model
             # Class
             if model.nc > 1:  # cls loss (only if multiple classes)
                 t = torch.full_like(ps[:, 5:], cn)  # targets
-                t[range(nb), tcls[i]] = cp
+                t[range(nb), tcls[i]] = cp  # one hot
                 lcls += BCEcls(ps[:, 5:], t)  # BCE
 
             # Append targets to text file
@@ -472,7 +472,7 @@ def compute_loss(p, targets, model):  # predictions, targets, model
     return loss * bs, torch.cat((lbox, lobj, lcls, loss)).detach()
 
 
-def build_targets(p, targets, model):
+def build_targets(pred, targets, model):
     # Build targets for compute_loss(), input targets(image,class,x,y,w,h)
     det = model.module.model[-1] if type(model) in (nn.parallel.DataParallel, nn.parallel.DistributedDataParallel) \
         else model.model[-1]  # Detect() module
@@ -480,18 +480,18 @@ def build_targets(p, targets, model):
     tcls, tbox, indices, anch = [], [], [], []
     gain = torch.ones(6, device=targets.device)  # normalized to gridspace gain
     off = torch.tensor([[1, 0], [0, 1], [-1, 0], [0, -1]], device=targets.device).float()  # overlap offsets
-    at = torch.arange(na).view(na, 1).repeat(1, nt)  # anchor tensor, same as .repeat_interleave(nt)
+    at = torch.arange(na).view(na, 1).repeat(1, nt)  # anchor tensor, same as .repeat_interleave(nt)  anchor index
 
     style = 'rect4'
     for i in range(det.nl):
         anchors = det.anchors[i]
-        gain[2:] = torch.tensor(p[i].shape)[[3, 2, 3, 2]]  # xyxy gain
+        gain[2:] = torch.tensor(pred[i].shape)[[3, 2, 3, 2]]  # xyxy gain
 
         # Match targets to anchors
         a, t, offsets = [], targets * gain, 0
         if nt:
-            r = t[None, :, 4:6] / anchors[:, None]  # wh ratio
-            j = torch.max(r, 1. / r).max(2)[0] < model.hyp['anchor_t']  # compare
+            r = t[None, :, 4:6] / anchors[:, None]  # wh ratio  target_wh/anchor_wh
+            j = torch.max(r, 1. / r).max(2)[0] < model.hyp['anchor_t']  # compare target_wh/anchor_wh ratio; 1/r: anchor_wh/target_wh ratio <4
             # j = wh_iou(anchors, t[:, 4:6]) > model.hyp['iou_t']  # iou(3,n) = wh_iou(anchors(3,2), gwh(n,2))
             a, t = at[j], t.repeat(na, 1, 1)[j]  # filter
 
@@ -506,8 +506,8 @@ def build_targets(p, targets, model):
 
             elif style == 'rect4':
                 g = 0.5  # offset
-                j, k = ((gxy % 1. < g) & (gxy > 1.)).T
-                l, m = ((gxy % 1. > (1 - g)) & (gxy < (gain[[2, 3]] - 1.))).T
+                j, k = ((gxy % 1. < g) & (gxy > 1.)).T  # decimal part <0.5 and x,y > 1,  <1:left/top boundary of the image j->x, k->y  ### ?????
+                l, m = ((gxy % 1. > (1 - g)) & (gxy < (gain[[2, 3]] - 1.))).T  # decimal part > (1 - g)      >img_wh -1: right boundary of the image
                 a, t = torch.cat((a, a[j], a[k], a[l], a[m]), 0), torch.cat((t, t[j], t[k], t[l], t[m]), 0)
                 offsets = torch.cat((z, z[j] + off[0], z[k] + off[1], z[l] + off[2], z[m] + off[3]), 0) * g
 
