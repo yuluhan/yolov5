@@ -536,8 +536,8 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, fast=False, c
     if prediction.dtype is torch.float16:
         prediction = prediction.float()  # to FP32
 
-    nc = prediction[0].shape[1] - 5  # number of classes
-    xc = prediction[..., 4] > conf_thres  # candidates
+    nc = prediction[0].shape[1] - 5  # number of classes   (48*80+24*40+12*20)*3
+    xc = prediction[..., 4] > conf_thres  # candidates  obj_conf>conf_thres
 
     # Settings
     min_wh, max_wh = 2, 4096  # (pixels) minimum and maximum box width and height
@@ -570,8 +570,8 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, fast=False, c
 
         # Detections matrix nx6 (xyxy, conf, cls)
         if multi_label:
-            i, j = (x[:, 5:] > conf_thres).nonzero().t()
-            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)
+            i, j = (x[:, 5:] > conf_thres).nonzero().t()#.nonzero()　get corresponding index; (obj_conf * cls_conf)>conf_thres
+            x = torch.cat((box[i], x[i, j + 5, None], j[:, None].float()), 1)   # bbox, conf, cls_index
         else:  # best class only
             conf, j = x[:, 5:].max(1, keepdim=True)
             x = torch.cat((box, conf, j.float()), 1)[conf.view(-1) > conf_thres]
@@ -591,10 +591,10 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, fast=False, c
 
         # Sort by confidence
         # x = x[x[:, 4].argsort(descending=True)]
-
+        # ===========================================
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
-        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
+        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores  ????????+c???
         i = torchvision.ops.boxes.nms(boxes, scores, iou_thres)
         if i.shape[0] > max_det:  # limit detections
             i = i[:max_det]

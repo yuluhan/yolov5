@@ -18,12 +18,34 @@ def detect(save_img=False):
 
     # Load model
     google_utils.attempt_download(weights)
-    model = torch.load(weights, map_location=device)['model'].float()  # load to FP32
-    # torch.save(torch.load(weights, map_location=device), weights)  # update model if SourceChangeWarning
+
+    # model = torch.load(weights, map_location=device)['model'].float()  # load to FP32
+    from models.yolo import Model
+    model = Model(model_cfg='/home/ai/yulu/yolov5/models/yolov5s.yaml').to(device)
+    if os.path.exists(opt.weights):
+        ckpt = torch.load('/home/ai/yulu/yolov5/weights/yolov5_adult_kid.pt', map_location=device)
+        state_dict = {key:ckpt['state_dict'][key] for key in model.state_dict().keys()}
+        model.load_state_dict(state_dict)
+    # ################
+    # model = torch.load(weights, map_location=device)
+    # ckpt = {'epoch': model['epoch'],
+    #         'best_fitness': model['best_fitness'],
+    #         'training_results': model['training_results'],
+    #         'state_dict': model['model'].state_dict(),
+    #         'optimizer': None}
+    # #
+    # #
+    # # # Save last, best and delete
+    # torch.save(ckpt, 'yolov5_adult_kid.pt')
+    # ################
+
     # model.fuse()
     model.to(device).eval()
+
+
     if half:
         model.half()  # to FP16
+
 
     # Second-stage classifier
     classify = False
@@ -43,13 +65,14 @@ def detect(save_img=False):
         dataset = LoadImages(source, img_size=imgsz)
 
     # Get names and colors
-    names = model.names if hasattr(model, 'names') else model.modules.names
+    names = ['child', 'adult']
+    # names = model.names if hasattr(model, 'names') else model.modules.names
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(names))]
 
     # Run inference
     t0 = time.time()
-    img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
-    _ = model(img.half() if half else img) if device.type != 'cpu' else None  # run once
+    # img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
+    # _ = model(img.half() if half else img) if device.type != 'cpu' else None  # run once
     for path, img, im0s, vid_cap in dataset:
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
@@ -59,8 +82,8 @@ def detect(save_img=False):
 
         # Inference
         t1 = torch_utils.time_synchronized()
+        # img_input = torch.cat([img[..., ::2, ::2], img[..., 1::2, ::2], img[..., ::2, 1::2], img[..., 1::2, 1::2]], 1)
         pred = model(img, augment=opt.augment)[0]
-
         # Apply NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres,
                                    fast=True, classes=opt.classes, agnostic=opt.agnostic_nms)
@@ -130,13 +153,13 @@ def detect(save_img=False):
         if platform == 'darwin':  # MacOS
             os.system('open ' + save_path)
 
-    print('Done. (%.3fs)' % (time.time() - t0))
+    print('Done. (%.3fs)' % (time.time() - t0));
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='weights/yolov5s.pt', help='model.pt path')
-    parser.add_argument('--source', type=str, default='inference/images', help='source')  # file/folder, 0 for webcam
+    parser.add_argument('--weights', type=str, default='weights/yolov5_adult_kid.pt', help='model.pt path')
+    parser.add_argument('--source', type=str, default='rtsp://admin:weizhilian1@192.168.1.66:554/Streaming/Channels/1', help='source')  # file/folder, 0 for webcam
     parser.add_argument('--output', type=str, default='inference/output', help='output folder')  # output folder
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.4, help='object confidence threshold')

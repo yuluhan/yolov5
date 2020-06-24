@@ -332,7 +332,7 @@ def train(hyp):
                 ckpt = {'epoch': epoch,
                         'best_fitness': best_fitness,
                         'training_results': f.read(),
-                        'model': copy.deepcopy(ema.ema).module if hasattr(model, 'module') else copy.deepcopy(ema.ema),
+                        'state_dict': copy.deepcopy(ema.ema).module.state_dict() if hasattr(model, 'module') else copy.deepcopy(ema.ema).state_dict(),
                         'optimizer': None if final_epoch else optimizer.state_dict()}
 
             # Save last, best and delete

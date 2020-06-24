@@ -37,6 +37,7 @@ class Detect(nn.Module):
                 z.append(y.view(bs, -1, self.no))
 
         return x if self.training else (torch.cat(z, 1), x)
+        # return x if self.training else torch.cat(z, 1)
 
     @staticmethod
     def _make_grid(nx=20, ny=20):
@@ -62,13 +63,14 @@ class Model(nn.Module):
         # Build strides, anchors
         m = self.model[-1]  # Detect()
         m.stride = torch.tensor([64 / x.shape[-2] for x in self.forward(torch.zeros(1, ch, 64, 64))])  # forward
+        # m.stride = torch.tensor([64 / x.shape[-2] for x in self.forward(torch.zeros(1, ch, 64, 64))])  # forward
         m.anchors /= m.stride.view(-1, 1, 1)
         self.stride = m.stride
 
         # Init weights, biases
         torch_utils.initialize_weights(self)
         self._initialize_biases()  # only run once
-        torch_utils.model_info(self)
+        # torch_utils.model_info(self)
         print('')
 
     def forward(self, x, augment=False, profile=False):
@@ -107,9 +109,9 @@ class Model(nn.Module):
 
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
-
-        if profile:
-            print('%.1fms total' % sum(dt))
+        #
+        # if profile:
+        #     print('%.1fms total' % sum(dt))
         return x
 
     def _initialize_biases(self, cf=None):  # initialize biases into Detect(), cf is class frequency
