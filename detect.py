@@ -117,7 +117,7 @@ def detect(save_img=False):
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         with open(save_path[:save_path.rfind('.')] + '.txt', 'a') as file:
-                            file.write(('%g ' * 5 + '\n') % (cls, *xywh))  # label format
+                            file.write(('%g %g %g %g %g' + '\n') % (cls, *xywh))  # label format
 
                     if save_img or view_img:  # Add bbox to image
                         label = '%s %.2f' % (names[int(cls)], conf)
@@ -159,7 +159,8 @@ def detect(save_img=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', type=str, default='weights/yolov5_adult_kid.pt', help='model.pt path')
-    parser.add_argument('--source', type=str, default='rtsp://admin:weizhilian1@192.168.1.66:554/Streaming/Channels/1', help='source')  # file/folder, 0 for webcam
+    # parser.add_argument('--source', type=str, default='rtsp://admin:weizhilian1@192.168.1.66:554/Streaming/Channels/1', help='source')  # file/folder, 0 for webcam
+    parser.add_argument('--source', type=str, default='/home/ai/MyFiles/Dataset/person_child/unlabel_adult', help='source')
     parser.add_argument('--output', type=str, default='inference/output', help='output folder')  # output folder
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.4, help='object confidence threshold')
