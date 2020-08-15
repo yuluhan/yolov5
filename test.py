@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 
 from utils.datasets import *
 from utils.utils import *
-
+from models.yolo import Model
 
 def test(data,
          weights=None,
@@ -32,8 +32,14 @@ def test(data,
 
         # Load model
         google_utils.attempt_download(weights)
-        model = torch.load(weights, map_location=device)['model'].float()  # load to FP32
-        torch_utils.model_info(model)
+        # model = torch.load(weights, map_location=device)['state_dict'].float()  # load to FP32
+        model = Model(model_cfg='/home/ai/yulu/yolov5/models/yolov5s.yaml')
+        if os.path.exists(opt.weights):
+            ckpt = torch.load(opt.weights, map_location=device)
+            state_dict = {key: ckpt['state_dict'][key] for key in model.state_dict().keys()}
+            model.load_state_dict(state_dict)
+
+        # torch_utils.model_info(model)
         model.fuse()
         model.to(device)
         if half:
@@ -82,7 +88,7 @@ def test(data,
                                 collate_fn=dataset.collate_fn)
 
     seen = 0
-    names = model.names if hasattr(model, 'names') else model.module.names
+    # names = model.names if hasattr(model, 'names') else model.module.names
     coco91class = coco80_to_coco91_class()
     s = ('%20s' + '%12s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
     p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
@@ -179,11 +185,13 @@ def test(data,
         # Plot images
         if batch_i < 1:
             f = 'test_batch%g_gt.jpg' % batch_i  # filename
-            plot_images(img, targets, paths, f, names)  # ground truth
+            # plot_images(img, targets, paths, f, names)  # ground truth
+            plot_images(img, targets, paths, f, 'yolov5s')
             f = 'test_batch%g_pred.jpg' % batch_i
-            plot_images(img, output_to_target(output, width, height), paths, f, names)  # predictions
+            # plot_images(img, output_to_target(output, width, height), paths, f, names)  # predictions
+            plot_images(img, output_to_target(output, width, height), paths, f, 'yolov5s')
 
-    # Compute statistics
+            # Compute statistics
     stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
     if len(stats):
         p, r, ap, f1, ap_class = ap_per_class(*stats)
@@ -243,7 +251,7 @@ def test(data,
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='test.py')
-    parser.add_argument('--weights', type=str, default='weights/yolov5s.pt', help='model.pt path')
+    parser.add_argument('--weights', type=str, default='weights/best0810.pt', help='model.pt path')
     parser.add_argument('--data', type=str, default='data/mytest.yaml', help='*.data path')
     parser.add_argument('--batch-size', type=int, default=16, help='size of each image batch')
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')

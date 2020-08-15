@@ -23,7 +23,7 @@ def detect(save_img=False):
     from models.yolo import Model
     model = Model(model_cfg='/home/ai/yulu/yolov5/models/yolov5s.yaml').to(device)
     if os.path.exists(opt.weights):
-        ckpt = torch.load('/home/ai/yulu/yolov5/weights/yolov5_adult_kid.pt', map_location=device)
+        ckpt = torch.load('/home/ai/yulu/yolov5/weights/best0722.pt', map_location=device)
         state_dict = {key:ckpt['state_dict'][key] for key in model.state_dict().keys()}
         model.load_state_dict(state_dict)
     # ################
@@ -42,10 +42,8 @@ def detect(save_img=False):
     # model.fuse()
     model.to(device).eval()
 
-
     if half:
         model.half()  # to FP16
-
 
     # Second-stage classifier
     classify = False
@@ -85,8 +83,10 @@ def detect(save_img=False):
         # img_input = torch.cat([img[..., ::2, ::2], img[..., 1::2, ::2], img[..., ::2, 1::2], img[..., 1::2, 1::2]], 1)
         pred = model(img, augment=opt.augment)[0]
         # Apply NMS
+        # pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres,
+        #                            fast=True, classes=opt.classes, agnostic=opt.agnostic_nms)
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres,
-                                   fast=True, classes=opt.classes, agnostic=opt.agnostic_nms)
+                                    fast=False, classes=opt.classes, agnostic=True)
         t2 = torch_utils.time_synchronized()
 
         # Apply Classifier
@@ -102,7 +102,7 @@ def detect(save_img=False):
 
             save_path = str(Path(out) / Path(p).name)
             s += '%gx%g ' % img.shape[2:]  # print string
-            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  #  normalization gain whwh
+            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]].float()  #  normalization gain whwh
             if det is not None and len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
@@ -153,14 +153,15 @@ def detect(save_img=False):
         if platform == 'darwin':  # MacOS
             os.system('open ' + save_path)
 
-    print('Done. (%.3fs)' % (time.time() - t0));
+    print('Done. (%.3fs)' % (time.time() - t0))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='weights/yolov5_adult_kid.pt', help='model.pt path')
+    parser.add_argument('--weights', type=str, default='weights/best0810.pt', help='model.pt path')
     # parser.add_argument('--source', type=str, default='rtsp://admin:weizhilian1@192.168.1.66:554/Streaming/Channels/1', help='source')  # file/folder, 0 for webcam
-    parser.add_argument('--source', type=str, default='/home/ai/MyFiles/Dataset/person_child/unlabel_adult', help='source')
+    parser.add_argument('--source', type=str, default='/home/ai/MyFiles/Dataset/person_child_dataset/child_lean_images_5', help='source')
+    # parser.add_argument('--source', type=str, default='/home/ai/yulu/yolov5/adult_child_images',help='source')
     parser.add_argument('--output', type=str, default='inference/output', help='output folder')  # output folder
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.4, help='object confidence threshold')

@@ -29,7 +29,7 @@ class Detect(nn.Module):
 
             if not self.training:  # inference
                 if self.grid[i].shape[2:4] != x[i].shape[2:4]:
-                    self.grid[i] = self._make_grid(nx, ny).to(x[i].device)
+                    self.grid[i] = self._make_grid(nx, ny).to(x[i].device).half()
 
                 y = x[i].sigmoid()
                 y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + self.grid[i].to(x[i].device)) * self.stride[i]  # xy
@@ -142,7 +142,7 @@ class Model(nn.Module):
                 m.conv = torch_utils.fuse_conv_and_bn(m.conv, m.bn)  # update conv
                 m.bn = None  # remove batchnorm
                 m.forward = m.fuseforward  # update forward
-        torch_utils.model_info(self)
+        # torch_utils.model_info(self)
 
 
 def parse_model(md, ch):  # model_dict, input_channels(3)

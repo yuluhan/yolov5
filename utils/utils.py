@@ -520,7 +520,7 @@ def build_targets(pred, targets, model):
 
         # Append
         indices.append((b, a, gj, gi))  # image, anchor, grid indices
-        tbox.append(torch.cat((gxy - gij, gwh), 1))  # box
+        tbox.append(torch.cat((gxy - gij.float(), gwh), 1))  # box
         anch.append(anchors[a])  # anchors
         tcls.append(c)  # class
 
@@ -545,7 +545,8 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, fast=False, c
     time_limit = 10.0  # seconds to quit after
     redundant = True  # require redundant detections
     fast |= conf_thres > 0.001  # fast mode
-    multi_label = nc > 1  # multiple labels per box (adds 0.5ms/img)
+    # multi_label = nc > 1  # multiple labels per box (adds 0.5ms/img)
+    multi_label = False
     if fast:
         merge = False
     else:
@@ -556,7 +557,7 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, fast=False, c
     for xi, x in enumerate(prediction):  # image index, image inference
         # Apply constraints
         # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
-        x = x[xc[xi]]  # confidence
+        x = x[xc[xi]]  # confidence      x1, y1, x2, y2, obj_conf, cls0_conf, cls1_conf
 
         # If none remain process next image
         if not x.shape[0]:
@@ -595,6 +596,7 @@ def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, fast=False, c
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
         boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores  ????????+c???
+        # boxes, scores = x[:, :4], x[:, 4]
         i = torchvision.ops.boxes.nms(boxes, scores, iou_thres)
         if i.shape[0] > max_det:  # limit detections
             i = i[:max_det]
