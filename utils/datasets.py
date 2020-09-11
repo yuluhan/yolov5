@@ -619,7 +619,6 @@ def load_mosaic(self, index):
 
 def load_mosaic2(self, index):
     # loads images in a mosaic
-
     labels2 = []
     s = self.img_size
     xc, yc = [int(random.uniform(s * 0.5, s * 1.5)) , s]  # mosaic center x, y
@@ -658,6 +657,7 @@ def load_mosaic2(self, index):
         np.clip(labels2[:, 1:], 0, 2 * s, out=labels2[:, 1:])  # use with random_affine
 
     # Augment
+    cv2.imwrite('before.jpg', img2)
     # img4 = img4[s // 2: int(s * 1.5), s // 2:int(s * 1.5)]  # center crop (WARNING, requires box pruning)
     img2, labels2 = random_affine2(img2, labels2,
                                   degrees=self.hyp['degrees'],
@@ -763,7 +763,7 @@ def random_affine(img, targets=(), degrees=10, translate=.1, scale=.1, shear=10,
         area = w * h
         area0 = (targets[:, 3] - targets[:, 1]) * (targets[:, 4] - targets[:, 2])
         ar = np.maximum(w / (h + 1e-16), h / (w + 1e-16))  # aspect ratio
-        i = (w > 4) & (h > 4) & (area / (area0 * s + 1e-16) > 0.5) & (ar < 10)
+        # i = (w > 4) & (h > 4) & (area / (area0 * s + 1e-16) > 0.5) & (ar < 10)
 
         targets = targets[i]
         targets[:, 1:5] = xy[i]
@@ -808,11 +808,11 @@ def random_affine2(img, targets=(), degrees=10, translate=.1, scale=.1, shear=10
         # warp points
         xy = np.ones((n * 4, 3))
         xy[:, :2] = targets[:, [1, 2, 3, 4, 1, 4, 3, 2]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
-        xy = (xy @ M.T)[:, :2].reshape(n, 8)  # x1y1, x2y2, x1y2, x2y1
+        xy = (xy @ M.T)[:, :2].reshape(n, 8)  # x1y1 x2y2 x1y2 x2y1
 
         # create new boxes
         x = xy[:, [0, 2, 4, 6]]   #x1, x2, x1, x2
-        y = xy[:, [1, 3, 5, 7]]   #x1, x2, x1, x2
+        y = xy[:, [1, 3, 5, 7]]   #y1, y2, y2, y1
         xy = np.concatenate((x.min(1), y.min(1), x.max(1), y.max(1))).reshape(4, n).T
 
         # # apply angle-based reduction of bounding boxes
@@ -832,11 +832,12 @@ def random_affine2(img, targets=(), degrees=10, translate=.1, scale=.1, shear=10
         area = w * h
         area0 = (targets[:, 3] - targets[:, 1]) * (targets[:, 4] - targets[:, 2])
         ar = np.maximum(w / (h + 1e-16), h / (w + 1e-16))  # aspect ratio
-        i = (w > 4) & (h > 4) & (area / (area0 * s + 1e-16) > 0.4) & (ar < 10)
+        # i = (w > 4) & (h > 4) & (area / (area0 * s + 1e-16) > 0.4) & (ar < 10)
+        i = (w > 4) & (h > 4) & (area / (area0 * s + 1e-16) > 0.6) & (ar < 4)
 
         targets = targets[i]
         targets[:, 1:5] = xy[i]
-
+    cv2.imwrite('after.jpg', img)
     return img, targets
 
 
